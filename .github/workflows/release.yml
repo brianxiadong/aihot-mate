@@ -2,18 +2,36 @@ name: Build Release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.1.1"
+        required: true
   push:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build:
-    name: Build ${{ matrix.os }}
+    name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        include:
+          - name: Windows
+            os: windows-latest
+            builder-args: --win nsis portable
+            artifact-name: aihot-mate-windows
+          - name: macOS Universal
+            os: macos-latest
+            builder-args: --mac dmg zip --universal
+            artifact-name: aihot-mate-macos
+
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
     steps:
       - name: Checkout
@@ -33,16 +51,56 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Windows artifact
-        if: runner.os == 'Windows'
-        run: pnpm dist:win
+      - name: Build renderer
+        run: pnpm build
 
-      - name: Build macOS artifact
-        if: runner.os == 'macOS'
-        run: pnpm dist:mac
+      - name: Package app
+        run: pnpm exec electron-builder ${{ matrix.builder-args }} --publish never
 
-      - name: Upload artifacts
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: aihot-mate-${{ runner.os }}
-          path: release/**
+          name: ${{ matrix.artifact-name }}
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.blockmap
+
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          name: AIHOT Mate ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          body: |
+            AIHOT Mate desktop release.
+
+            Assets:
+            - Windows installer and portable executable.
+            - macOS universal DMG/ZIP for Intel and Apple Silicon Macs.
+
+            The macOS build is unsigned. If macOS blocks it, right-click the app and choose Open, or remove quarantine with:
+
+            ```bash
+            xattr -dr com.apple.quarantine "/Applications/AIHOT Mate.app"
+            ```
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.blockmap
