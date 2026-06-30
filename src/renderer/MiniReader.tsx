@@ -1,4 +1,4 @@
-import { Bookmark, ChevronLeft, ChevronRight, ExternalLink, Loader2, Maximize2, Star, X } from "lucide-react";
+import { Bookmark, CheckCheck, ChevronLeft, ChevronRight, ExternalLink, Loader2, Maximize2, Star, X } from "lucide-react";
 import { MouseEvent, useEffect, useMemo, useState } from "react";
 import type { AppState, FeedItem, ReaderArticle } from "../preload/preload";
 import { mate } from "./bridge";
@@ -183,6 +183,9 @@ function MiniReader() {
           onClick={() => mate.toggleSaved(selectedItem.id).then(setState)}
         >
           <Bookmark size={16} />
+        </button>
+        <button type="button" title="全部已读" onClick={() => mate.markAllRead().then(setState)}>
+          <CheckCheck size={16} />
         </button>
         <button type="button" title="浏览器打开" onClick={() => mate.openExternal(selectedItem.url)}>
           <ExternalLink size={16} />

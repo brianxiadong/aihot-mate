@@ -776,7 +776,7 @@ button {
   width: 126px;
   height: 118px;
   object-fit: contain;
-  filter: drop-shadow(0 16px 18px rgba(15, 23, 42, 0.25));
+  filter: none;
 }
 
 .pet-ear {
@@ -897,7 +897,7 @@ button {
 }
 
 .pet-surface.hot .pet-body {
-  filter: drop-shadow(0 0 13px rgba(249, 115, 22, 0.42));
+  filter: none;
 }
 
 .pet-surface.new .pet-body {
@@ -1046,7 +1046,7 @@ button {
 
 .mini-actions {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 8px;
   padding: 10px;
   border-top: 1px solid var(--border);

@@ -166,6 +166,13 @@ const browserFallback: MateBridge = {
     });
     return fallbackState;
   },
+  markAllRead: async () => {
+    fallbackState = recalcCounts({
+      ...fallbackState,
+      items: fallbackState.items.map((item) => ({ ...item, isRead: true }))
+    });
+    return fallbackState;
+  },
   toggleFavorite: async (itemId: string) => {
     fallbackState = recalcCounts({
       ...fallbackState,

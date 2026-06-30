@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("aihotMate", {
   sync: () => ipcRenderer.invoke("content:sync"),
   loadArticle: (itemId) => ipcRenderer.invoke("article:load", itemId),
   markRead: (itemId, isRead) => ipcRenderer.invoke("item:mark-read", itemId, isRead),
+  markAllRead: () => ipcRenderer.invoke("item:mark-all-read"),
   toggleFavorite: (itemId) => ipcRenderer.invoke("item:toggle-favorite", itemId),
   toggleSaved: (itemId) => ipcRenderer.invoke("item:toggle-saved", itemId),
   addRssSource: (input) => ipcRenderer.invoke("sources:add-rss", input),

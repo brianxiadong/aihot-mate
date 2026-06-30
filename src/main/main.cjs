@@ -12,6 +12,7 @@ let miniWindow = null;
 let tray = null;
 let store = null;
 let syncTimer = null;
+let petBoundsSaveTimer = null;
 let isSyncing = false;
 
 function createTrayImage() {
@@ -71,11 +72,22 @@ function createMainWindow() {
 function createPetWindow() {
   if (petWindow && !petWindow.isDestroyed()) return petWindow;
   const primary = screen.getPrimaryDisplay().workArea;
+  const savedBounds = store.getState().petBounds;
+  const width = 176;
+  const height = 176;
+  const x =
+    savedBounds && Number.isFinite(savedBounds.x)
+      ? clamp(savedBounds.x, primary.x, primary.x + primary.width - width)
+      : primary.x + primary.width - 208;
+  const y =
+    savedBounds && Number.isFinite(savedBounds.y)
+      ? clamp(savedBounds.y, primary.y, primary.y + primary.height - height)
+      : primary.y + primary.height - 220;
   petWindow = new BrowserWindow({
-    width: 176,
-    height: 176,
-    x: primary.x + primary.width - 208,
-    y: primary.y + primary.height - 220,
+    width,
+    height,
+    x,
+    y,
     frame: false,
     transparent: true,
     resizable: false,
@@ -96,6 +108,7 @@ function createPetWindow() {
 
   petWindow.setAlwaysOnTop(true, "floating");
   petWindow.on("moved", () => {
+    schedulePersistPetBounds();
     if (miniWindow && !miniWindow.isDestroyed() && miniWindow.isVisible()) {
       positionMiniWindow();
     }
@@ -193,6 +206,26 @@ function hideMiniWindow() {
     miniWindow.hide();
   }
   return true;
+}
+
+function persistPetBounds() {
+  if (!store || !petWindow || petWindow.isDestroyed()) return;
+  const bounds = petWindow.getBounds();
+  store.setState((state) => ({
+    ...state,
+    petBounds: {
+      x: bounds.x,
+      y: bounds.y
+    }
+  }));
+}
+
+function schedulePersistPetBounds() {
+  if (petBoundsSaveTimer) clearTimeout(petBoundsSaveTimer);
+  petBoundsSaveTimer = setTimeout(() => {
+    petBoundsSaveTimer = null;
+    persistPetBounds();
+  }, 300);
 }
 
 function clamp(value, min, max) {
@@ -343,10 +376,14 @@ async function syncAllSources(options = {}) {
     store.setState((state) => {
       const merged = upsertItems(state, allItems);
       newItems = merged.newIds.map((id) => merged.itemsById[id]).filter(Boolean);
+      const readIds = state.hasCompletedInitialSync
+        ? state.readIds
+        : Array.from(new Set([...state.readIds, ...merged.itemOrder]));
       return {
         ...state,
         itemsById: merged.itemsById,
         itemOrder: merged.itemOrder,
+        readIds,
         etags: nextEtags,
         lastSyncAt: new Date().toISOString(),
         hasCompletedInitialSync: true
@@ -417,6 +454,15 @@ function markRead(itemId, isRead = true) {
     else set.delete(itemId);
     return { ...state, readIds: Array.from(set) };
   });
+  broadcastState();
+  return publicState();
+}
+
+function markAllRead() {
+  store.setState((state) => ({
+    ...state,
+    readIds: Array.from(new Set([...state.readIds, ...state.itemOrder]))
+  }));
   broadcastState();
   return publicState();
 }
@@ -500,6 +546,7 @@ function registerIpc() {
   ipcMain.handle("content:sync", () => syncAllSources({ notify: true, reason: "manual" }));
   ipcMain.handle("article:load", (_event, itemId) => loadArticle(itemId));
   ipcMain.handle("item:mark-read", (_event, itemId, isRead) => markRead(itemId, isRead));
+  ipcMain.handle("item:mark-all-read", () => markAllRead());
   ipcMain.handle("item:toggle-favorite", (_event, itemId) => toggleSetField("favoriteIds", itemId));
   ipcMain.handle("item:toggle-saved", (_event, itemId) => toggleSetField("savedIds", itemId));
   ipcMain.handle("sources:add-rss", (_event, input) => addRssSource(input));
@@ -521,6 +568,7 @@ function registerIpc() {
     const x = clamp(Math.round(bounds.x + Number(deltaX || 0)), display.x, display.x + display.width - bounds.width);
     const y = clamp(Math.round(bounds.y + Number(deltaY || 0)), display.y, display.y + display.height - bounds.height);
     petWindow.setPosition(x, y);
+    schedulePersistPetBounds();
     if (miniWindow && !miniWindow.isDestroyed() && miniWindow.isVisible()) {
       positionMiniWindow();
     }
@@ -549,6 +597,8 @@ app.on("activate", () => {
 app.on("before-quit", () => {
   app.isQuitting = true;
   if (syncTimer) clearInterval(syncTimer);
+  if (petBoundsSaveTimer) clearTimeout(petBoundsSaveTimer);
+  persistPetBounds();
 });
 
 app.on("window-all-closed", () => {

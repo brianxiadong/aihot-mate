@@ -76,6 +76,7 @@ declare global {
       sync: () => Promise<AppState>;
       loadArticle: (itemId: string) => Promise<ReaderArticle>;
       markRead: (itemId: string, isRead: boolean) => Promise<AppState>;
+      markAllRead: () => Promise<AppState>;
       toggleFavorite: (itemId: string) => Promise<AppState>;
       toggleSaved: (itemId: string) => Promise<AppState>;
       addRssSource: (input: AddRssInput) => Promise<AppState>;

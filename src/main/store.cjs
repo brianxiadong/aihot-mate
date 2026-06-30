@@ -16,6 +16,7 @@ function defaultState() {
     readIds: [],
     favoriteIds: [],
     savedIds: [],
+    petBounds: null,
     etags: {},
     settings: {
       refreshMinutes: 10,
@@ -69,6 +70,7 @@ function createStore(app) {
       readIds: Array.isArray(current.readIds) ? current.readIds : [],
       favoriteIds: Array.isArray(current.favoriteIds) ? current.favoriteIds : [],
       savedIds: Array.isArray(current.savedIds) ? current.savedIds : [],
+      petBounds: current.petBounds || null,
       etags: current.etags || {}
     };
   }
