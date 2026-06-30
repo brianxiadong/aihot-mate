@@ -1,0 +1,84 @@
+{
+  "name": "aihot-mate",
+  "version": "0.1.0",
+  "description": "A cross-platform desktop companion for AI news feeds, alerts, and full-content reading.",
+  "author": "VIRXACT",
+  "license": "MIT",
+  "private": true,
+  "main": "src/main/main.cjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "electron:dev": "concurrently -k \"pnpm dev\" \"wait-on tcp:5173 && electron .\"",
+    "typecheck": "tsc --noEmit",
+    "build": "pnpm typecheck && vite build",
+    "start": "electron .",
+    "dist": "pnpm build && electron-builder --publish never",
+    "dist:win": "pnpm build && electron-builder --win nsis portable --publish never",
+    "dist:mac": "pnpm build && electron-builder --mac dmg zip --publish never"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "fast-xml-parser": "^5.2.5",
+    "jsdom": "^26.1.0",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sanitize-html": "^2.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/sanitize-html": "^2.13.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.virxact.aihotmate",
+    "productName": "AIHOT Mate",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "src/main/**/*",
+      "src/preload/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "src/main/main.cjs"
+    },
+    "asar": true,
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "artifactName": "${productName}-${version}-setup-${arch}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.news",
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    }
+  }
+}
