@@ -138,7 +138,7 @@ function MiniReader() {
   }
 
   function embeddedSourceUrl(item: FeedItem) {
-    return item.originalUrl || item.readerUrl || item.url;
+    return item.readerUrl || item.url || item.originalUrl;
   }
 
   if (!selectedItem) {

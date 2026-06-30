@@ -2,7 +2,7 @@ const path = require("node:path");
 const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, shell, nativeImage, screen, powerMonitor } = require("electron");
 const { createStore } = require("./store.cjs");
 const { getEnabledAdapters } = require("./sources/registry.cjs");
-const { extractReadableArticle } = require("./reader.cjs");
+const { extractReadableArticle, sanitizeContent } = require("./reader.cjs");
 const {
   checkForUpdates,
   downloadUpdate,
@@ -171,7 +171,8 @@ function createMiniWindow(itemId) {
       preload: path.join(__dirname, "../preload/preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      webviewTag: true
     }
   });
 
@@ -529,11 +530,11 @@ async function loadArticle(itemId) {
     throw new Error("Item not found.");
   }
 
-  if (state.articlesById[itemId]) {
+  if (state.articlesById[itemId] && isUsefulArticle(state.articlesById[itemId], item)) {
     return state.articlesById[itemId];
   }
 
-  if (item.embeddedArticle) {
+  if (item.embeddedArticle && isUsefulArticle(item.embeddedArticle, item)) {
     store.setState((current) => ({
       ...current,
       articlesById: {
@@ -544,7 +545,28 @@ async function loadArticle(itemId) {
     return item.embeddedArticle;
   }
 
-  const article = await extractReadableArticle(item.readerUrl || item.url || item.originalUrl);
+  let article = null;
+  let lastError = null;
+  for (const url of articleUrlsForItem(item)) {
+    try {
+      const candidate = await extractReadableArticle(url);
+      if (isUsefulArticle(candidate, item)) {
+        article = candidate;
+        break;
+      }
+      lastError = new Error("Extracted article content was too short.");
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (!article) {
+    article = buildSummaryArticle(item, state);
+  }
+  if (!article) {
+    throw lastError || new Error("Article content is unavailable.");
+  }
+
   store.setState((current) => ({
     ...current,
     articlesById: {
@@ -554,6 +576,95 @@ async function loadArticle(itemId) {
   }));
   broadcastState();
   return article;
+}
+
+function articleUrlsForItem(item) {
+  const values = item.sourceId === "aihot" ? [item.readerUrl, item.url, item.originalUrl] : [item.originalUrl, item.readerUrl, item.url];
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function isUsefulArticle(article, item) {
+  if (!article || !article.content) return false;
+  const text = stripHtml(article.content);
+  const summary = normalizePlainText(item.summary || "");
+  if (!text) return false;
+  if (/精选全部日报更多|AI HOT$/i.test(text) && text.length < 220) return false;
+  if (summary.length > 120 && text.length < Math.min(summary.length * 0.75, 220)) return false;
+  return true;
+}
+
+function buildSummaryArticle(item, state) {
+  const related = findRelatedItems(item, state).slice(0, 8);
+  const parts = [];
+  if (item.summary) {
+    parts.push("<h2>AI 摘要</h2>");
+    parts.push(`<p>${escapeHtml(item.summary)}</p>`);
+  }
+  if (related.length > 0) {
+    parts.push("<h2>同一事件的相关报道</h2>");
+    parts.push("<ul>");
+    related.forEach((relatedItem) => {
+      const label = `${relatedItem.title}${relatedItem.sourceName ? ` - ${relatedItem.sourceName}` : ""}`;
+      parts.push(`<li><a href="${escapeAttribute(relatedItem.url || relatedItem.readerUrl || relatedItem.originalUrl)}">${escapeHtml(label)}</a></li>`);
+    });
+    parts.push("</ul>");
+  }
+  if (parts.length === 0) return null;
+  return {
+    title: item.title,
+    byline: item.sourceName || item.channel || "",
+    excerpt: item.summary || "",
+    siteName: item.sourceName || "",
+    content: sanitizeContent(parts.join("\n")),
+    sourceUrl: item.readerUrl || item.url || item.originalUrl,
+    fetchedAt: new Date().toISOString()
+  };
+}
+
+function findRelatedItems(item, state) {
+  const sourceNames = Array.isArray(item.raw?.sourceNames) ? item.raw.sourceNames : [];
+  const titleTerms = new Set(
+    normalizePlainText(item.title || "")
+      .toLowerCase()
+      .split(/[\s:：,，.。·\-_/()（）]+/)
+      .filter((term) => term.length >= 4)
+  );
+  return state.itemOrder
+    .map((id) => state.itemsById[id])
+    .filter(Boolean)
+    .filter((candidate) => candidate.id !== item.id)
+    .filter((candidate) => {
+      if (candidate.sourceId !== item.sourceId) return false;
+      if (candidate.externalId === item.externalId) return true;
+      if (sourceNames.includes(candidate.sourceName)) return true;
+      const candidateText = normalizePlainText(`${candidate.title} ${candidate.summary}`).toLowerCase();
+      let matches = 0;
+      titleTerms.forEach((term) => {
+        if (candidateText.includes(term)) matches += 1;
+      });
+      return matches >= Math.min(2, titleTerms.size);
+    });
+}
+
+function stripHtml(value) {
+  return normalizePlainText(String(value || "").replace(/<[^>]+>/g, " "));
+}
+
+function normalizePlainText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value || "").replaceAll("`", "&#096;");
 }
 
 function toggleSetField(field, itemId) {
