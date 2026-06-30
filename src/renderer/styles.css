@@ -328,6 +328,7 @@ button {
 
 .feed-card {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: 8px;
   min-height: 148px;
@@ -360,6 +361,10 @@ button {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.feed-card-bottom {
+  margin-top: auto;
 }
 
 .feed-card-top {
