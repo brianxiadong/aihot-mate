@@ -86,6 +86,9 @@ declare global {
       openMain: (itemId?: string) => Promise<boolean>;
       openMini: (itemId?: string) => Promise<boolean>;
       closeMini: () => Promise<boolean>;
+      startPetDrag: (pointerX: number, pointerY: number) => void;
+      dragPetTo: (pointerX: number, pointerY: number) => void;
+      endPetDrag: () => void;
       movePetBy: (deltaX: number, deltaY: number) => void;
       onStateChanged: (callback: (state: AppState) => void) => () => void;
       onFocusItem: (callback: (itemId: string) => void) => () => void;

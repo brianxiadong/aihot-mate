@@ -57,6 +57,7 @@ function PetApp() {
       totalX: 0,
       totalY: 0
     };
+    mate.startPetDrag(event.screenX, event.screenY);
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
@@ -71,7 +72,7 @@ function PetApp() {
     if (drag.totalX + drag.totalY > 4) {
       drag.moved = true;
     }
-    mate.movePetBy(deltaX, deltaY);
+    mate.dragPetTo(event.screenX, event.screenY);
     drag.x = event.screenX;
     drag.y = event.screenY;
   }
@@ -79,9 +80,20 @@ function PetApp() {
   function handlePetPointerUp(event: PointerEvent<HTMLButtonElement>) {
     const moved = dragRef.current.moved;
     dragRef.current.active = false;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    mate.endPetDrag();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
     if (!moved) {
       openMini();
+    }
+  }
+
+  function handlePetPointerCancel(event: PointerEvent<HTMLButtonElement>) {
+    dragRef.current.active = false;
+    mate.endPetDrag();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
     }
   }
 
@@ -111,6 +123,7 @@ function PetApp() {
         onPointerDown={handlePetPointerDown}
         onPointerMove={handlePetPointerMove}
         onPointerUp={handlePetPointerUp}
+        onPointerCancel={handlePetPointerCancel}
       >
         <img className="pet-skin" src={petSkinUrl} alt="" draggable={false} />
         <span className="pet-core">

@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld("aihotMate", {
   openMain: (itemId) => ipcRenderer.invoke("window:open-main", itemId),
   openMini: (itemId) => ipcRenderer.invoke("window:open-mini", itemId),
   closeMini: () => ipcRenderer.invoke("window:close-mini"),
+  startPetDrag: (pointerX, pointerY) => ipcRenderer.send("window:start-pet-drag", pointerX, pointerY),
+  dragPetTo: (pointerX, pointerY) => ipcRenderer.send("window:drag-pet-to", pointerX, pointerY),
+  endPetDrag: () => ipcRenderer.send("window:end-pet-drag"),
   movePetBy: (deltaX, deltaY) => ipcRenderer.send("window:move-pet-by", deltaX, deltaY),
   onStateChanged: (callback) => {
     const listener = (_event, state) => callback(state);

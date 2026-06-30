@@ -13,6 +13,7 @@ let tray = null;
 let store = null;
 let syncTimer = null;
 let petBoundsSaveTimer = null;
+let petDragState = null;
 let isSyncing = false;
 
 function createTrayImage() {
@@ -111,7 +112,7 @@ function createPetWindow() {
   petWindow.setAlwaysOnTop(true, "floating");
   petWindow.on("moved", () => {
     schedulePersistPetBounds();
-    if (miniWindow && !miniWindow.isDestroyed() && miniWindow.isVisible()) {
+    if (!petDragState && miniWindow && !miniWindow.isDestroyed() && miniWindow.isVisible()) {
       positionMiniWindow();
     }
   });
@@ -234,22 +235,77 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function positionMiniWindow() {
+function positionMiniWindow(anchorBounds = null) {
   if (!miniWindow || miniWindow.isDestroyed()) return;
-  const anchor = petWindow && !petWindow.isDestroyed() ? petWindow.getBounds() : screen.getPrimaryDisplay().workArea;
+  const anchor = anchorBounds || (petWindow && !petWindow.isDestroyed() ? petWindow.getBounds() : screen.getPrimaryDisplay().workArea);
   const bounds = miniWindow.getBounds();
   const workArea = screen.getDisplayMatching(anchor).workArea;
+  const margin = 8;
+  const gap = 10;
+  const preferredHeight = 580;
+  const maxHeight = Math.max(220, Math.min(preferredHeight, workArea.height - margin * 2));
+  const minHeight = Math.min(240, maxHeight);
+  const width = Math.min(bounds.width, workArea.width - margin * 2);
+  const topEdge = workArea.y + margin;
+  const bottomEdge = workArea.y + workArea.height - margin;
+  const aboveSpace = Math.max(0, anchor.y - gap - topEdge);
+  const belowSpace = Math.max(0, bottomEdge - (anchor.y + anchor.height + gap));
+  const placeAbove = aboveSpace >= belowSpace;
+  const availableHeight = placeAbove ? aboveSpace : belowSpace;
+  const height = clamp(Math.min(preferredHeight, availableHeight), minHeight, maxHeight);
   const x = clamp(
-    Math.round(anchor.x + anchor.width / 2 - bounds.width / 2),
-    workArea.x + 8,
-    workArea.x + workArea.width - bounds.width - 8
+    Math.round(anchor.x + anchor.width / 2 - width / 2),
+    workArea.x + margin,
+    workArea.x + workArea.width - width - margin
   );
-  let y = Math.round(anchor.y - bounds.height - 10);
-  if (y < workArea.y + 8) {
-    y = Math.round(anchor.y + anchor.height + 10);
+  const targetY = placeAbove ? anchor.y - height - gap : anchor.y + anchor.height + gap;
+  const y = clamp(Math.round(targetY), topEdge, bottomEdge - height);
+  miniWindow.setBounds({ x, y, width, height: Math.round(height) });
+}
+
+function movePetWindowTo(x, y, bounds = null) {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const currentBounds = bounds || petWindow.getBounds();
+  const display = screen.getDisplayNearestPoint({
+    x: Math.round(x + currentBounds.width / 2),
+    y: Math.round(y + currentBounds.height / 2)
+  }).workArea;
+  const nextX = clamp(Math.round(x), display.x, display.x + display.width - currentBounds.width);
+  const nextY = clamp(Math.round(y), display.y, display.y + display.height - currentBounds.height);
+  petWindow.setPosition(nextX, nextY);
+  schedulePersistPetBounds();
+  if (miniWindow && !miniWindow.isDestroyed() && miniWindow.isVisible()) {
+    positionMiniWindow({ ...currentBounds, x: nextX, y: nextY });
   }
-  y = clamp(y, workArea.y + 8, workArea.y + workArea.height - bounds.height - 8);
-  miniWindow.setBounds({ x, y, width: bounds.width, height: bounds.height });
+}
+
+function startPetDrag(pointerX, pointerY) {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  petDragState = {
+    pointerX: Number(pointerX || 0),
+    pointerY: Number(pointerY || 0),
+    bounds: petWindow.getBounds()
+  };
+}
+
+function dragPetTo(pointerX, pointerY) {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  if (!petDragState) {
+    startPetDrag(pointerX, pointerY);
+  }
+  const drag = petDragState;
+  const currentPointerX = Number(pointerX || 0);
+  const currentPointerY = Number(pointerY || 0);
+  movePetWindowTo(
+    drag.bounds.x + currentPointerX - drag.pointerX,
+    drag.bounds.y + currentPointerY - drag.pointerY,
+    drag.bounds
+  );
+}
+
+function endPetDrag() {
+  petDragState = null;
+  schedulePersistPetBounds();
 }
 
 function publicState() {
@@ -563,17 +619,19 @@ function registerIpc() {
   });
   ipcMain.handle("window:open-mini", (_event, itemId) => showMiniWindow(itemId));
   ipcMain.handle("window:close-mini", () => hideMiniWindow());
+  ipcMain.on("window:start-pet-drag", (_event, pointerX, pointerY) => {
+    startPetDrag(pointerX, pointerY);
+  });
+  ipcMain.on("window:drag-pet-to", (_event, pointerX, pointerY) => {
+    dragPetTo(pointerX, pointerY);
+  });
+  ipcMain.on("window:end-pet-drag", () => {
+    endPetDrag();
+  });
   ipcMain.on("window:move-pet-by", (_event, deltaX, deltaY) => {
     if (!petWindow || petWindow.isDestroyed()) return;
     const bounds = petWindow.getBounds();
-    const display = screen.getDisplayMatching(bounds).workArea;
-    const x = clamp(Math.round(bounds.x + Number(deltaX || 0)), display.x, display.x + display.width - bounds.width);
-    const y = clamp(Math.round(bounds.y + Number(deltaY || 0)), display.y, display.y + display.height - bounds.height);
-    petWindow.setPosition(x, y);
-    schedulePersistPetBounds();
-    if (miniWindow && !miniWindow.isDestroyed() && miniWindow.isVisible()) {
-      positionMiniWindow();
-    }
+    movePetWindowTo(bounds.x + Number(deltaX || 0), bounds.y + Number(deltaY || 0), bounds);
   });
   ipcMain.handle("open:external", (_event, url) => {
     if (!url) return false;
