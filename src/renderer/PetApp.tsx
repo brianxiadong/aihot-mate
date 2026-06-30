@@ -8,7 +8,7 @@ const initialState: AppState = {
   version: 1,
   lastSyncAt: null,
   settings: {
-    refreshMinutes: 10,
+    refreshMinutes: 5,
     notificationsEnabled: true,
     notifyMinScore: 78,
     keywords: []

@@ -59,7 +59,7 @@ const initialState: AppState = {
   version: 1,
   lastSyncAt: null,
   settings: {
-    refreshMinutes: 10,
+    refreshMinutes: 5,
     notificationsEnabled: true,
     notifyMinScore: 78,
     keywords: []
@@ -579,7 +579,7 @@ function App() {
                 <span>同步间隔</span>
                 <input
                   type="number"
-                  min={3}
+                  min={1}
                   max={120}
                   value={settingsDraft.refreshMinutes}
                   onChange={(event) =>

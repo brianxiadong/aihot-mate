@@ -6,7 +6,7 @@ const sampleState: AppState = {
   version: 1,
   lastSyncAt: new Date().toISOString(),
   settings: {
-    refreshMinutes: 10,
+    refreshMinutes: 5,
     notificationsEnabled: true,
     notifyMinScore: 78,
     keywords: ["OpenAI", "Claude", "Agent"]

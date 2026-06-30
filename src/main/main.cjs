@@ -1,5 +1,5 @@
 const path = require("node:path");
-const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, shell, nativeImage, screen } = require("electron");
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, shell, nativeImage, screen, powerMonitor } = require("electron");
 const { createStore } = require("./store.cjs");
 const { getEnabledAdapters } = require("./sources/registry.cjs");
 const { extractReadableArticle } = require("./reader.cjs");
@@ -13,6 +13,10 @@ const {
 } = require("./updater.cjs");
 
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
+const DEFAULT_AUTO_SYNC_MINUTES = 5;
+const MIN_AUTO_SYNC_MINUTES = 1;
+const STALE_SYNC_MAX_AGE_MS = 60 * 1000;
+const MIN_SYNC_TIMER_DELAY_MS = 15 * 1000;
 
 let mainWindow = null;
 let petWindow = null;
@@ -195,7 +199,7 @@ function createTray() {
       },
       {
         label: "立即同步",
-        click: () => syncAllSources({ notify: true, reason: "manual" })
+        click: () => runSyncNow({ notify: true, reason: "manual" }).catch((error) => console.error(error))
       },
       {
         label: "检查更新",
@@ -219,6 +223,7 @@ function showMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+  syncIfStale("window-open", { notify: false, maxAgeMs: STALE_SYNC_MAX_AGE_MS });
 }
 
 function showMiniWindow(itemId) {
@@ -226,6 +231,7 @@ function showMiniWindow(itemId) {
   positionMiniWindow();
   window.show();
   window.focus();
+  syncIfStale("mini-open", { notify: false, maxAgeMs: STALE_SYNC_MAX_AGE_MS });
   if (itemId) {
     window.webContents.send("mini:item-focus", itemId);
   }
@@ -620,7 +626,7 @@ function addRssSource(input) {
     };
   });
   broadcastState();
-  return syncAllSources({ notify: false, reason: "source-added" });
+  return runSyncNow({ notify: false, reason: "source-added" });
 }
 
 function toggleSource(sourceId, enabled) {
@@ -638,7 +644,10 @@ function updateSettings(patch) {
     settings: {
       ...state.settings,
       ...patch,
-      refreshMinutes: Math.max(3, Number(patch.refreshMinutes || state.settings.refreshMinutes || 10)),
+      refreshMinutes: Math.max(
+        MIN_AUTO_SYNC_MINUTES,
+        Number(patch.refreshMinutes || state.settings.refreshMinutes || DEFAULT_AUTO_SYNC_MINUTES)
+      ),
       notifyMinScore: Math.max(0, Math.min(100, Number(patch.notifyMinScore ?? state.settings.notifyMinScore)))
     }
   }));
@@ -647,17 +656,53 @@ function updateSettings(patch) {
   return publicState();
 }
 
-function scheduleSync() {
-  if (syncTimer) clearInterval(syncTimer);
-  const minutes = store ? store.getState().settings.refreshMinutes : 10;
-  syncTimer = setInterval(() => {
-    syncAllSources({ notify: true, reason: "timer" }).catch((error) => console.error(error));
-  }, Math.max(3, minutes) * 60 * 1000);
+function autoSyncIntervalMs() {
+  const minutes = store ? Number(store.getState().settings.refreshMinutes) : DEFAULT_AUTO_SYNC_MINUTES;
+  const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_AUTO_SYNC_MINUTES;
+  return Math.max(MIN_AUTO_SYNC_MINUTES, safeMinutes) * 60 * 1000;
+}
+
+function clearSyncTimer() {
+  if (syncTimer) {
+    clearTimeout(syncTimer);
+    syncTimer = null;
+  }
+}
+
+function scheduleSync(delayMs = autoSyncIntervalMs()) {
+  if (!store || app.isQuitting) return;
+  clearSyncTimer();
+  const safeDelayMs = Math.max(MIN_SYNC_TIMER_DELAY_MS, Number(delayMs) || autoSyncIntervalMs());
+  syncTimer = setTimeout(() => {
+    syncTimer = null;
+    syncAllSources({ notify: true, reason: "timer" })
+      .catch((error) => console.error(error))
+      .finally(() => scheduleSync());
+  }, safeDelayMs);
+  if (typeof syncTimer.unref === "function") syncTimer.unref();
+}
+
+async function runSyncNow(options = {}) {
+  if (!store || app.isQuitting) return null;
+  clearSyncTimer();
+  try {
+    return await syncAllSources(options);
+  } finally {
+    scheduleSync();
+  }
+}
+
+function syncIfStale(reason, options = {}) {
+  if (!store || app.isQuitting || isSyncing) return;
+  const lastSyncMs = new Date(store.getState().lastSyncAt || 0).getTime();
+  const maxAgeMs = Number.isFinite(options.maxAgeMs) ? options.maxAgeMs : autoSyncIntervalMs();
+  if (lastSyncMs > 0 && Date.now() - lastSyncMs < maxAgeMs) return;
+  runSyncNow({ notify: Boolean(options.notify), reason }).catch((error) => console.error(error));
 }
 
 function registerIpc() {
   ipcMain.handle("state:get", () => publicState());
-  ipcMain.handle("content:sync", () => syncAllSources({ notify: true, reason: "manual" }));
+  ipcMain.handle("content:sync", () => runSyncNow({ notify: true, reason: "manual" }));
   ipcMain.handle("updates:get-state", () => getUpdateState());
   ipcMain.handle("updates:check", (_event, options) => checkForUpdates(options || {}));
   ipcMain.handle("updates:download", () => downloadUpdate());
@@ -708,10 +753,18 @@ app.whenReady().then(async () => {
   createPetWindow();
   createTray();
   scheduleSync();
-  await syncAllSources({ notify: false, reason: "startup" });
+  runSyncNow({ notify: false, reason: "startup" }).catch((error) => console.error(error));
   setTimeout(() => {
     checkForUpdates({ silent: true, autoDownload: true }).catch((error) => console.error(error));
   }, 12000);
+});
+
+app.on("browser-window-focus", () => {
+  syncIfStale("window-focus", { notify: false, maxAgeMs: STALE_SYNC_MAX_AGE_MS });
+});
+
+powerMonitor.on("resume", () => {
+  syncIfStale("resume", { notify: true, maxAgeMs: STALE_SYNC_MAX_AGE_MS });
 });
 
 app.on("web-contents-created", (_event, contents) => {
@@ -729,7 +782,7 @@ app.on("activate", () => {
 
 app.on("before-quit", () => {
   app.isQuitting = true;
-  if (syncTimer) clearInterval(syncTimer);
+  clearSyncTimer();
   if (petBoundsSaveTimer) clearTimeout(petBoundsSaveTimer);
   persistPetBounds();
 });

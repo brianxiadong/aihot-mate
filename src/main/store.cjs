@@ -1,13 +1,16 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const STATE_VERSION = 2;
+const DEFAULT_REFRESH_MINUTES = 5;
+
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
 function defaultState() {
   return {
-    version: 1,
+    version: STATE_VERSION,
     hasCompletedInitialSync: false,
     lastSyncAt: null,
     itemsById: {},
@@ -19,7 +22,7 @@ function defaultState() {
     petBounds: null,
     etags: {},
     settings: {
-      refreshMinutes: 10,
+      refreshMinutes: DEFAULT_REFRESH_MINUTES,
       notificationsEnabled: true,
       notifyMinScore: 78,
       keywords: ["OpenAI", "Claude", "Anthropic", "Google", "Meta", "Agent", "Sora"]
@@ -59,10 +62,17 @@ function createStore(app) {
 
   function migrateState(current) {
     const base = defaultState();
+    const previousVersion = Number(current.version || 1);
+    const settings = { ...base.settings, ...(current.settings || {}) };
+    if (previousVersion < 2 && Number(settings.refreshMinutes) === 10) {
+      settings.refreshMinutes = DEFAULT_REFRESH_MINUTES;
+    }
+    settings.refreshMinutes = Math.max(1, Number(settings.refreshMinutes || DEFAULT_REFRESH_MINUTES));
     return {
       ...base,
       ...current,
-      settings: { ...base.settings, ...(current.settings || {}) },
+      version: STATE_VERSION,
+      settings,
       sources: Array.isArray(current.sources) && current.sources.length > 0 ? current.sources : base.sources,
       itemsById: current.itemsById || {},
       itemOrder: Array.isArray(current.itemOrder) ? current.itemOrder : [],
