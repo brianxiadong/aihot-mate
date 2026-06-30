@@ -6,6 +6,7 @@ import PetApp from "./PetApp";
 import "./styles.css";
 
 const surface = new URLSearchParams(window.location.search).get("surface") || "main";
+document.documentElement.dataset.surface = surface;
 document.body.dataset.surface = surface;
 
 function Root() {

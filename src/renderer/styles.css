@@ -22,6 +22,16 @@
   box-sizing: border-box;
 }
 
+html[data-surface="pet"],
+html[data-surface="mini"] {
+  background: transparent;
+}
+
+html[data-surface="pet"] #root,
+html[data-surface="mini"] #root {
+  background: transparent;
+}
+
 body {
   margin: 0;
   overflow: hidden;
