@@ -25,13 +25,25 @@ let petDragState = null;
 let isSyncing = false;
 let updateNotificationVersion = null;
 
-function createTrayImage() {
+function iconPath(fileName) {
+  return path.join(__dirname, "../../assets/icons", fileName);
+}
+
+function createFallbackTrayImage() {
   const svg = encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
       <rect width="32" height="32" rx="8" fill="#0f766e"/>
       <path fill="#fff" d="M16 5l2.3 7.1h7.5l-6 4.3 2.3 7.1-6.1-4.4-6.1 4.4 2.3-7.1-6-4.3h7.5L16 5z"/>
     </svg>`);
   return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${svg}`);
+}
+
+function createTrayImage() {
+  const image = nativeImage.createFromPath(iconPath("icon-tray.png"));
+  if (image.isEmpty()) return createFallbackTrayImage();
+  return process.platform === "darwin"
+    ? image.resize({ width: 18, height: 18 })
+    : image.resize({ width: 32, height: 32 });
 }
 
 function rendererUrl(surface, params = {}) {
@@ -58,6 +70,7 @@ function createMainWindow() {
     minWidth: 960,
     minHeight: 640,
     title: "AIHOT Mate",
+    icon: iconPath("icon.png"),
     backgroundColor: "#f5f7fb",
     show: false,
     webPreferences: {
@@ -99,6 +112,7 @@ function createPetWindow() {
     height,
     x,
     y,
+    icon: iconPath("icon.png"),
     frame: false,
     transparent: true,
     resizable: false,
@@ -137,6 +151,7 @@ function createMiniWindow(itemId) {
   miniWindow = new BrowserWindow({
     width: 430,
     height: 580,
+    icon: iconPath("icon.png"),
     frame: false,
     transparent: true,
     resizable: false,
