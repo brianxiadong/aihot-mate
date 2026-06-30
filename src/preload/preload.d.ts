@@ -69,11 +69,41 @@ export type AddRssInput = {
   category?: string;
 };
 
+export type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "current"
+  | "available"
+  | "downloading"
+  | "downloaded"
+  | "installing"
+  | "error";
+
+export type UpdateState = {
+  status: UpdateStatus;
+  currentVersion: string;
+  latestVersion: string | null;
+  releaseUrl: string | null;
+  assetName: string | null;
+  downloadedPath: string | null;
+  progress: {
+    transferred: number | null;
+    total: number | null;
+    percent: number | null;
+  } | null;
+  error: string | null;
+};
+
 declare global {
   interface Window {
     aihotMate?: {
       getState: () => Promise<AppState>;
       sync: () => Promise<AppState>;
+      getUpdateState: () => Promise<UpdateState>;
+      checkForUpdates: (options?: { silent?: boolean; autoDownload?: boolean }) => Promise<UpdateState>;
+      downloadUpdate: () => Promise<UpdateState>;
+      installUpdate: () => Promise<UpdateState>;
+      openUpdateRelease: () => Promise<boolean>;
       loadArticle: (itemId: string) => Promise<ReaderArticle>;
       markRead: (itemId: string, isRead: boolean) => Promise<AppState>;
       markAllRead: () => Promise<AppState>;
@@ -93,6 +123,7 @@ declare global {
       onStateChanged: (callback: (state: AppState) => void) => () => void;
       onFocusItem: (callback: (itemId: string) => void) => () => void;
       onMiniFocusItem: (callback: (itemId: string) => void) => () => void;
+      onUpdateChanged: (callback: (state: UpdateState) => void) => () => void;
     };
   }
 }

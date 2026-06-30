@@ -38,3 +38,36 @@ pnpm dist:mac
 ```
 
 Unsigned builds are intended for internal first-release testing. Public distribution should add Windows code signing and Apple notarization.
+
+## Signed GitHub Release updates
+
+AIHOT Mate includes a custom GitHub Release updater for internal distribution. It does not require Apple Developer ID signing, but it does not bypass macOS Gatekeeper on first install. The update channel uses an app-embedded Ed25519 public key and verifies both `latest.json` and the downloaded update asset before installing.
+
+Release assets produced by CI include:
+
+- `latest.json`
+- `latest.json.sig`
+- `AIHOT.Mate-<version>-mac-universal.app.tar.gz`
+- Windows installer / portable executables
+
+Generate the updater key pair once:
+
+```powershell
+pnpm update:keys
+```
+
+Commit only `src/main/update-public-key.cjs`. Never commit `secrets/`. Add the contents of `secrets/update-private-key.base64.txt` to the GitHub Actions secret:
+
+```text
+UPDATE_SIGNING_PRIVATE_KEY_BASE64
+```
+
+Local verification:
+
+```powershell
+pnpm dist:win
+pnpm update:sign -- --version 0.1.2 --tag v0.1.2 --release-dir release --out-dir release
+pnpm update:verify -- --manifest release/latest.json --asset-root release
+```
+
+macOS installation remains unsigned unless Apple Developer ID signing/notarization is added later. Once the app is running, updates are accepted only if the manifest and update archive match the embedded updater public key.

@@ -3,6 +3,7 @@ import {
   BellOff,
   Bookmark,
   Check,
+  Download,
   FileText,
   Clock3,
   ExternalLink,
@@ -22,7 +23,7 @@ import {
   X
 } from "lucide-react";
 import { FormEvent, MouseEvent, useEffect, useMemo, useState } from "react";
-import type { AddRssInput, AppSettings, AppState, FeedItem, ReaderArticle } from "../preload/preload";
+import type { AddRssInput, AppSettings, AppState, FeedItem, ReaderArticle, UpdateState } from "../preload/preload";
 import { mate } from "./bridge";
 
 type ViewKey = "latest" | "hot" | "unread" | "favorites" | "saved" | "ai-models" | "ai-products" | "paper" | "industry" | "tip";
@@ -71,6 +72,17 @@ const initialState: AppState = {
     favorites: 0,
     saved: 0
   }
+};
+
+const initialUpdateState: UpdateState = {
+  status: "idle",
+  currentVersion: "0.0.0",
+  latestVersion: null,
+  releaseUrl: null,
+  assetName: null,
+  downloadedPath: null,
+  progress: null,
+  error: null
 };
 
 function formatRelativeTime(value: string | null) {
@@ -122,6 +134,21 @@ function scoreTone(score: number | null) {
   return "score";
 }
 
+function updateLabel(update: UpdateState) {
+  if (update.status === "checking") return "检查更新";
+  if (update.status === "available") return `下载 v${update.latestVersion}`;
+  if (update.status === "downloading") {
+    return update.progress?.percent !== null && update.progress?.percent !== undefined
+      ? `下载 ${update.progress.percent}%`
+      : "下载更新";
+  }
+  if (update.status === "downloaded") return "安装更新";
+  if (update.status === "installing") return "正在安装";
+  if (update.status === "current") return "已是最新";
+  if (update.status === "error") return "更新失败";
+  return "检查更新";
+}
+
 function App() {
   const [state, setState] = useState<AppState>(initialState);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -135,6 +162,7 @@ function App() {
   const [rssInput, setRssInput] = useState<AddRssInput>({ name: "", feedUrl: "", category: "rss" });
   const [settingsDraft, setSettingsDraft] = useState<AppSettings>(initialState.settings);
   const [error, setError] = useState<string | null>(null);
+  const [updateState, setUpdateState] = useState<UpdateState>(initialUpdateState);
 
   useEffect(() => {
     mate.getState().then((nextState) => {
@@ -162,6 +190,11 @@ function App() {
       offFocus();
     };
   }, [selectedId]);
+
+  useEffect(() => {
+    mate.getUpdateState().then(setUpdateState);
+    return mate.onUpdateChanged(setUpdateState);
+  }, []);
 
   const selectedItem = useMemo(
     () => state.items.find((item) => item.id === selectedId) || state.items[0] || null,
@@ -257,6 +290,21 @@ function App() {
     }
   }
 
+  async function handleUpdateAction() {
+    if (updateState.status === "checking" || updateState.status === "downloading" || updateState.status === "installing") {
+      return;
+    }
+    if (updateState.status === "downloaded") {
+      setUpdateState(await mate.installUpdate());
+      return;
+    }
+    if (updateState.status === "available") {
+      setUpdateState(await mate.downloadUpdate());
+      return;
+    }
+    setUpdateState(await mate.checkForUpdates({ autoDownload: true }));
+  }
+
   function handleArticleClick(event: MouseEvent<HTMLElement>) {
     const target = event.target as HTMLElement;
     const anchor = target.closest("a");
@@ -320,6 +368,18 @@ function App() {
             </label>
           ))}
         </section>
+
+        <button
+          className="settings-button"
+          type="button"
+          onClick={handleUpdateAction}
+          title={updateState.error || "检查更新"}
+          disabled={updateState.status === "checking" || updateState.status === "downloading" || updateState.status === "installing"}
+        >
+          <Download size={17} className={updateState.status === "checking" || updateState.status === "downloading" ? "spin" : ""} />
+          <span>{updateLabel(updateState)}</span>
+        </button>
+        {updateState.status === "error" && updateState.error ? <small className="update-error">{updateState.error}</small> : null}
 
         <button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} title="设置">
           <Settings size={17} />

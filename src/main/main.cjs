@@ -3,6 +3,14 @@ const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, shell, nativeImag
 const { createStore } = require("./store.cjs");
 const { getEnabledAdapters } = require("./sources/registry.cjs");
 const { extractReadableArticle } = require("./reader.cjs");
+const {
+  checkForUpdates,
+  downloadUpdate,
+  getUpdateState,
+  installUpdate,
+  openUpdateReleasePage,
+  setUpdateBroadcaster
+} = require("./updater.cjs");
 
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
 
@@ -15,6 +23,7 @@ let syncTimer = null;
 let petBoundsSaveTimer = null;
 let petDragState = null;
 let isSyncing = false;
+let updateNotificationVersion = null;
 
 function createTrayImage() {
   const svg = encodeURIComponent(`
@@ -172,6 +181,10 @@ function createTray() {
       {
         label: "立即同步",
         click: () => syncAllSources({ notify: true, reason: "manual" })
+      },
+      {
+        label: "检查更新",
+        click: () => checkForUpdates({ autoDownload: true }).catch((error) => console.error(error))
       },
       { type: "separator" },
       {
@@ -349,6 +362,34 @@ function broadcastState() {
   }
   if (miniWindow && !miniWindow.isDestroyed()) {
     miniWindow.webContents.send("state:changed", publicState());
+  }
+}
+
+function broadcastUpdateState() {
+  const state = getUpdateState();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("update:changed", state);
+  }
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send("update:changed", state);
+  }
+  if (miniWindow && !miniWindow.isDestroyed()) {
+    miniWindow.webContents.send("update:changed", state);
+  }
+
+  if (state.status === "downloaded" && state.latestVersion && updateNotificationVersion !== state.latestVersion) {
+    updateNotificationVersion = state.latestVersion;
+    if (Notification.isSupported()) {
+      const notification = new Notification({
+        title: "AIHOT Mate 更新已就绪",
+        body: `v${state.latestVersion} 已下载并通过签名校验，点击安装。`,
+        silent: false
+      });
+      notification.on("click", () => {
+        installUpdate().catch((error) => console.error(error));
+      });
+      notification.show();
+    }
   }
 }
 
@@ -602,6 +643,11 @@ function scheduleSync() {
 function registerIpc() {
   ipcMain.handle("state:get", () => publicState());
   ipcMain.handle("content:sync", () => syncAllSources({ notify: true, reason: "manual" }));
+  ipcMain.handle("updates:get-state", () => getUpdateState());
+  ipcMain.handle("updates:check", (_event, options) => checkForUpdates(options || {}));
+  ipcMain.handle("updates:download", () => downloadUpdate());
+  ipcMain.handle("updates:install", () => installUpdate());
+  ipcMain.handle("updates:open-release", () => openUpdateReleasePage());
   ipcMain.handle("article:load", (_event, itemId) => loadArticle(itemId));
   ipcMain.handle("item:mark-read", (_event, itemId, isRead) => markRead(itemId, isRead));
   ipcMain.handle("item:mark-all-read", () => markAllRead());
@@ -641,12 +687,16 @@ function registerIpc() {
 
 app.whenReady().then(async () => {
   store = createStore(app);
+  setUpdateBroadcaster(broadcastUpdateState);
   registerIpc();
   createMainWindow();
   createPetWindow();
   createTray();
   scheduleSync();
   await syncAllSources({ notify: false, reason: "startup" });
+  setTimeout(() => {
+    checkForUpdates({ silent: true, autoDownload: true }).catch((error) => console.error(error));
+  }, 12000);
 });
 
 app.on("web-contents-created", (_event, contents) => {

@@ -57,6 +57,10 @@ jobs:
       - name: Package app
         run: pnpm exec electron-builder ${{ matrix.builder-args }} --publish never
 
+      - name: Create macOS updater archive
+        if: runner.os == 'macOS'
+        run: node scripts/create-mac-update-archive.cjs
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -66,6 +70,7 @@ jobs:
             release/*.exe
             release/*.dmg
             release/*.zip
+            release/*.app.tar.gz
             release/*.blockmap
 
   publish:
@@ -74,10 +79,24 @@ jobs:
     needs: build
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Sign update assets
+        env:
+          UPDATE_SIGNING_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY_BASE64 }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          node scripts/sign-release-assets.cjs --version "$VERSION" --tag "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --release-dir artifacts --out-dir artifacts/update
+
+      - name: Verify update assets
+        run: node scripts/verify-update-assets.cjs --manifest artifacts/update/latest.json --asset-root artifacts
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
@@ -99,8 +118,13 @@ jobs:
             ```bash
             xattr -dr com.apple.quarantine "/Applications/AIHOT Mate.app"
             ```
+
+            Updates are verified with AIHOT Mate's built-in Ed25519 update signature before installation.
           files: |
             artifacts/**/*.exe
             artifacts/**/*.dmg
             artifacts/**/*.zip
+            artifacts/**/*.app.tar.gz
             artifacts/**/*.blockmap
+            artifacts/**/latest.json
+            artifacts/**/latest.json.sig

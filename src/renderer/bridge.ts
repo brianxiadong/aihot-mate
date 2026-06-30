@@ -1,4 +1,4 @@
-import type { AddRssInput, AppSettings, AppState, ReaderArticle } from "../preload/preload";
+import type { AddRssInput, AppSettings, AppState, ReaderArticle, UpdateState } from "../preload/preload";
 
 type MateBridge = NonNullable<Window["aihotMate"]>;
 
@@ -107,6 +107,17 @@ const sampleState: AppState = {
 
 let fallbackState = sampleState;
 
+const fallbackUpdateState: UpdateState = {
+  status: "idle",
+  currentVersion: "0.0.0",
+  latestVersion: null,
+  releaseUrl: null,
+  assetName: null,
+  downloadedPath: null,
+  progress: null,
+  error: null
+};
+
 const fallbackArticles: Record<string, ReaderArticle> = {
   "preview:hot:meta": {
     title: sampleState.items[0].title,
@@ -158,6 +169,11 @@ const browserFallback: MateBridge = {
     fallbackState = { ...fallbackState, lastSyncAt: new Date().toISOString() };
     return fallbackState;
   },
+  getUpdateState: async () => fallbackUpdateState,
+  checkForUpdates: async () => fallbackUpdateState,
+  downloadUpdate: async () => fallbackUpdateState,
+  installUpdate: async () => fallbackUpdateState,
+  openUpdateRelease: async () => true,
   loadArticle: async (itemId: string) => fallbackArticles[itemId] || fallbackArticles["preview:hot:meta"],
   markRead: async (itemId: string, isRead: boolean) => {
     fallbackState = recalcCounts({
@@ -230,7 +246,8 @@ const browserFallback: MateBridge = {
   movePetBy: () => undefined,
   onStateChanged: () => () => undefined,
   onFocusItem: () => () => undefined,
-  onMiniFocusItem: () => () => undefined
+  onMiniFocusItem: () => () => undefined,
+  onUpdateChanged: () => () => undefined
 };
 
 export const mate: MateBridge = window.aihotMate ?? browserFallback;

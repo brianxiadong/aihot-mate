@@ -203,6 +203,15 @@ button {
   margin-top: auto;
 }
 
+.settings-button + .update-error {
+  display: block;
+  margin: -10px 8px 0 38px;
+  color: #fecdd3;
+  font-size: 11px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
 .feed-pane {
   display: flex;
   flex-direction: column;

@@ -3,6 +3,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("aihotMate", {
   getState: () => ipcRenderer.invoke("state:get"),
   sync: () => ipcRenderer.invoke("content:sync"),
+  getUpdateState: () => ipcRenderer.invoke("updates:get-state"),
+  checkForUpdates: (options) => ipcRenderer.invoke("updates:check", options),
+  downloadUpdate: () => ipcRenderer.invoke("updates:download"),
+  installUpdate: () => ipcRenderer.invoke("updates:install"),
+  openUpdateRelease: () => ipcRenderer.invoke("updates:open-release"),
   loadArticle: (itemId) => ipcRenderer.invoke("article:load", itemId),
   markRead: (itemId, isRead) => ipcRenderer.invoke("item:mark-read", itemId, isRead),
   markAllRead: () => ipcRenderer.invoke("item:mark-all-read"),
@@ -33,5 +38,10 @@ contextBridge.exposeInMainWorld("aihotMate", {
     const listener = (_event, itemId) => callback(itemId);
     ipcRenderer.on("mini:item-focus", listener);
     return () => ipcRenderer.removeListener("mini:item-focus", listener);
+  },
+  onUpdateChanged: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("update:changed", listener);
+    return () => ipcRenderer.removeListener("update:changed", listener);
   }
 });

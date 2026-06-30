@@ -1,6 +1,6 @@
 {
   "name": "aihot-mate",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A cross-platform desktop companion for AI news feeds, alerts, and full-content reading.",
   "author": "VIRXACT",
   "license": "MIT",
@@ -14,7 +14,11 @@
     "start": "electron .",
     "dist": "pnpm build && electron-builder --publish never",
     "dist:win": "pnpm build && electron-builder --win nsis portable --publish never",
-    "dist:mac": "pnpm build && electron-builder --mac dmg zip --publish never"
+    "dist:mac": "pnpm build && electron-builder --mac dmg zip --publish never",
+    "update:keys": "node scripts/generate-update-keys.cjs",
+    "update:archive:mac": "node scripts/create-mac-update-archive.cjs",
+    "update:sign": "node scripts/sign-release-assets.cjs",
+    "update:verify": "node scripts/verify-update-assets.cjs"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
@@ -63,14 +67,14 @@
       ]
     },
     "nsis": {
-      "artifactName": "${productName}-${version}-setup-${arch}.${ext}",
+      "artifactName": "AIHOT.Mate-${version}-setup-${arch}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
     "portable": {
-      "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
+      "artifactName": "AIHOT.Mate-${version}-portable-${arch}.${ext}"
     },
     "mac": {
       "target": [
@@ -78,7 +82,7 @@
         "zip"
       ],
       "category": "public.app-category.news",
-      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+      "artifactName": "AIHOT.Mate-${version}-${os}-${arch}.${ext}"
     }
   }
 }
