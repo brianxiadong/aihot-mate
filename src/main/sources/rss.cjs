@@ -79,7 +79,7 @@ function normalizeRssItem(entry, source) {
     sourceName: source.name,
     channel: source.name,
     title,
-    summary: normalizeText(summaryText).slice(0, 420),
+    summary: normalizeText(summaryText),
     url: link,
     originalUrl: link,
     readerUrl: link,
@@ -93,7 +93,7 @@ function normalizeRssItem(entry, source) {
       ? {
           title,
           byline: source.name,
-          excerpt: normalizeText(summaryText).slice(0, 240),
+          excerpt: normalizeText(summaryText),
           siteName: source.name,
           content: sanitizeHtml(textOf(summaryHtml), {
             allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "figure", "figcaption", "pre", "code"]),

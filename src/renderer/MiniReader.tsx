@@ -167,40 +167,42 @@ function MiniReader() {
         </button>
       </header>
 
-      <section className="mini-headline">
-        <h1>{selectedItem.title}</h1>
-        <p>{selectedItem.summary}</p>
-      </section>
+      <div className={readerMode === "source" ? "mini-content source" : "mini-content"}>
+        <section className="mini-headline">
+          <h1>{selectedItem.title}</h1>
+          <p>{selectedItem.summary}</p>
+        </section>
 
-      {readerMode === "source" ? (
-        <div className="mini-webview-wrap">
-          <webview
-            className="mini-webview"
-            src={embeddedSourceUrl(selectedItem)}
-            partition="persist:aihot-mate-reader"
-            webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
-          />
-        </div>
-      ) : (
-        <article className="mini-article" onClick={handleArticleClick}>
-          {articleStatus === "loading" ? (
-            <div className="mini-loading">
-              <Loader2 size={18} className="spin" />
+        {readerMode === "source" ? (
+          <div className="mini-webview-wrap">
+            <webview
+              className="mini-webview"
+              src={embeddedSourceUrl(selectedItem)}
+              partition="persist:aihot-mate-reader"
+              webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
+            />
+          </div>
+        ) : (
+          <article className="mini-article" onClick={handleArticleClick}>
+            {articleStatus === "loading" ? (
+              <div className="mini-loading">
+                <Loader2 size={18} className="spin" />
               <span>加载正文</span>
             </div>
-          ) : null}
-          {articleStatus === "error" ? (
-            <div className="mini-inline-fallback">
-              <p>{selectedItem.summary}</p>
-              <button type="button" onClick={() => setReaderMode("source")}>
-                <Globe2 size={14} />
+            ) : null}
+            {articleStatus === "error" ? (
+              <div className="mini-inline-fallback">
+                <p>{selectedItem.summary}</p>
+                <button type="button" onClick={() => setReaderMode("source")}>
+                  <Globe2 size={14} />
                 <span>看原网页</span>
-              </button>
+                </button>
             </div>
-          ) : null}
-          {articleStatus === "ready" && article ? <div dangerouslySetInnerHTML={{ __html: article.content }} /> : null}
-        </article>
-      )}
+            ) : null}
+            {articleStatus === "ready" && article ? <div dangerouslySetInnerHTML={{ __html: article.content }} /> : null}
+          </article>
+        )}
+      </div>
 
       <footer className="mini-actions">
         <button type="button" title="上一条" onClick={() => move(-1)} disabled={selectedIndex <= 0}>

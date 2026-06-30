@@ -74,16 +74,16 @@ function createPetWindow() {
   if (petWindow && !petWindow.isDestroyed()) return petWindow;
   const primary = screen.getPrimaryDisplay().workArea;
   const savedBounds = store.getState().petBounds;
-  const width = 176;
-  const height = 176;
+  const width = 248;
+  const height = 238;
   const x =
     savedBounds && Number.isFinite(savedBounds.x)
       ? clamp(savedBounds.x, primary.x, primary.x + primary.width - width)
-      : primary.x + primary.width - 208;
+      : primary.x + primary.width - 280;
   const y =
     savedBounds && Number.isFinite(savedBounds.y)
       ? clamp(savedBounds.y, primary.y, primary.y + primary.height - height)
-      : primary.y + primary.height - 220;
+      : primary.y + primary.height - 282;
   petWindow = new BrowserWindow({
     width,
     height,
@@ -125,8 +125,8 @@ function createPetWindow() {
 function createMiniWindow(itemId) {
   if (miniWindow && !miniWindow.isDestroyed()) return miniWindow;
   miniWindow = new BrowserWindow({
-    width: 382,
-    height: 462,
+    width: 430,
+    height: 580,
     frame: false,
     transparent: true,
     resizable: false,

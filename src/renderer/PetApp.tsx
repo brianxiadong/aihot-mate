@@ -23,9 +23,9 @@ const initialState: AppState = {
   }
 };
 
-function shortTitle(item: FeedItem | null) {
+function displayTitle(item: FeedItem | null) {
   if (!item) return "正在守着 AI 圈";
-  return item.title.length > 28 ? `${item.title.slice(0, 28)}...` : item.title;
+  return item.title;
 }
 
 function PetApp() {
@@ -101,7 +101,7 @@ function PetApp() {
           {featured?.kind === "hot-topic" ? <Flame size={13} /> : <Sparkles size={13} />}
           {state.counts.unread > 0 ? `${state.counts.unread} 条新内容` : "AIHOT Mate"}
         </span>
-        <strong>{shortTitle(featured)}</strong>
+        <strong>{displayTitle(featured)}</strong>
       </button>
 
       <button
