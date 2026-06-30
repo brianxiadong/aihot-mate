@@ -3,9 +3,11 @@ import {
   BellOff,
   Bookmark,
   Check,
+  FileText,
   Clock3,
   ExternalLink,
   Flame,
+  Globe2,
   Inbox,
   Layers3,
   Loader2,
@@ -26,6 +28,7 @@ import { mate } from "./bridge";
 type ViewKey = "latest" | "hot" | "unread" | "favorites" | "saved" | "ai-models" | "ai-products" | "paper" | "industry" | "tip";
 
 type ArticleStatus = "idle" | "loading" | "ready" | "error";
+type ReaderMode = "article" | "source";
 
 const categoryLabels: Record<string, string> = {
   "ai-models": "模型",
@@ -124,6 +127,7 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [article, setArticle] = useState<ReaderArticle | null>(null);
   const [articleStatus, setArticleStatus] = useState<ArticleStatus>("idle");
+  const [readerMode, setReaderMode] = useState<ReaderMode>("article");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewKey>("latest");
   const [isSyncing, setIsSyncing] = useState(false);
@@ -174,6 +178,7 @@ function App() {
     let canceled = false;
     setArticle(null);
     setArticleStatus("loading");
+    setReaderMode("article");
     mate.markRead(selectedItem.id, true).then(setState).catch(() => undefined);
     mate
       .loadArticle(selectedItem.id)
@@ -259,6 +264,10 @@ function App() {
       event.preventDefault();
       mate.openExternal(anchor.href);
     }
+  }
+
+  function embeddedSourceUrl(item: FeedItem) {
+    return item.originalUrl || item.readerUrl || item.url;
   }
 
   return (
@@ -418,6 +427,22 @@ function App() {
             <div className="reader-summary">
               <span className="category-pill">{categoryLabels[selectedItem.category] || selectedItem.category}</span>
               {selectedItem.score !== null ? <span className={scoreTone(selectedItem.score)}>{selectedItem.score}</span> : null}
+              <button
+                className={readerMode === "article" ? "reader-mode-button active" : "reader-mode-button"}
+                type="button"
+                onClick={() => setReaderMode("article")}
+              >
+                <FileText size={15} />
+                <span>阅读版</span>
+              </button>
+              <button
+                className={readerMode === "source" ? "reader-mode-button active" : "reader-mode-button"}
+                type="button"
+                onClick={() => setReaderMode("source")}
+              >
+                <Globe2 size={15} />
+                <span>原网页</span>
+              </button>
               {selectedItem.originalUrl && selectedItem.originalUrl !== selectedItem.url ? (
                 <button type="button" onClick={() => mate.openExternal(selectedItem.originalUrl || selectedItem.url)}>
                   原文
@@ -425,29 +450,51 @@ function App() {
               ) : null}
             </div>
 
-            <article className="article-body" onClick={handleArticleClick}>
-              {articleStatus === "loading" ? (
-                <div className="loading-state">
-                  <Loader2 size={22} className="spin" />
-                  <span>加载正文</span>
-                </div>
-              ) : null}
-              {articleStatus === "error" ? (
-                <div className="fallback-body">
-                  <p>{selectedItem.summary}</p>
-                  <button type="button" onClick={() => mate.openExternal(selectedItem.url)}>
-                    <ExternalLink size={16} />
-                    <span>浏览器打开</span>
-                  </button>
-                </div>
-              ) : null}
-              {articleStatus === "ready" && article ? (
-                <>
-                  {article.byline ? <p className="article-byline">{article.byline}</p> : null}
-                  <div dangerouslySetInnerHTML={{ __html: article.content }} />
-                </>
-              ) : null}
-            </article>
+            {readerMode === "source" ? (
+              <div className="embedded-reader">
+                <webview
+                  className="embedded-webview"
+                  src={embeddedSourceUrl(selectedItem)}
+                  partition="persist:aihot-mate-reader"
+                  webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
+                />
+              </div>
+            ) : (
+              <article className="article-body" onClick={handleArticleClick}>
+                {articleStatus === "loading" ? (
+                  <div className="loading-state">
+                    <Loader2 size={22} className="spin" />
+                    <span>加载正文</span>
+                  </div>
+                ) : null}
+                {articleStatus === "error" ? (
+                  <div className="fallback-body">
+                    <p>{selectedItem.summary}</p>
+                    <button type="button" onClick={() => setReaderMode("source")}>
+                      <Globe2 size={16} />
+                      <span>在伴侣内看原网页</span>
+                    </button>
+                    <button type="button" onClick={() => mate.openExternal(selectedItem.url)}>
+                      <ExternalLink size={16} />
+                      <span>浏览器打开</span>
+                    </button>
+                  </div>
+                ) : null}
+                {articleStatus === "ready" && article ? (
+                  <>
+                    {article.byline ? <p className="article-byline">{article.byline}</p> : null}
+                    <div dangerouslySetInnerHTML={{ __html: article.content }} />
+                    <div className="article-source-hint">
+                      <span>如果这里不是完整正文，可以切到原网页，仍在桌面伴侣内查看。</span>
+                      <button type="button" onClick={() => setReaderMode("source")}>
+                        <Globe2 size={15} />
+                        <span>原网页</span>
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+              </article>
+            )}
           </>
         ) : (
           <div className="reader-empty">

@@ -470,6 +470,9 @@ button {
 }
 
 .reader-summary button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 28px;
   padding: 0 10px;
   border: 1px solid var(--border);
@@ -477,6 +480,12 @@ button {
   color: #344353;
   background: #ffffff;
   cursor: pointer;
+}
+
+.reader-mode-button.active {
+  color: #ffffff;
+  border-color: var(--teal);
+  background: var(--teal);
 }
 
 .article-body {
@@ -487,6 +496,53 @@ button {
   color: #1f2937;
   font-size: 16px;
   line-height: 1.72;
+}
+
+.embedded-reader {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.embedded-webview,
+.mini-webview {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.article-source-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #f8fafc;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.article-source-hint button,
+.mini-inline-fallback button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: max-content;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--teal);
+  cursor: pointer;
 }
 
 .article-body h1,
@@ -1012,6 +1068,19 @@ button {
   line-height: 1.65;
 }
 
+.mini-webview-wrap {
+  min-height: 0;
+  padding: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.mini-inline-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .mini-article h1,
 .mini-article h2,
 .mini-article h3 {
@@ -1046,7 +1115,7 @@ button {
 
 .mini-actions {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: 8px;
   padding: 10px;
   border-top: 1px solid var(--border);

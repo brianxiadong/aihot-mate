@@ -7,6 +7,7 @@ AIHOT Mate is a cross-platform desktop companion for AI news feeds. It keeps a l
 - Electron desktop app for Windows and macOS.
 - Draggable always-on-top desktop pet window.
 - Pet-attached mini reader for quick new-item reading without opening the main app.
+- Embedded original-page reader for items whose extracted article text is incomplete.
 - Built-in AIHOT source adapter.
 - Generic RSS source adapter for future feed expansion.
 - Local JSON cache for items, read state, favorites, saved items, settings, and article cache.

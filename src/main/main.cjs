@@ -54,7 +54,8 @@ function createMainWindow() {
       preload: path.join(__dirname, "../preload/preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      webviewTag: true
     }
   });
 
@@ -102,7 +103,8 @@ function createPetWindow() {
       preload: path.join(__dirname, "../preload/preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      webviewTag: true
     }
   });
 
@@ -587,6 +589,14 @@ app.whenReady().then(async () => {
   createTray();
   scheduleSync();
   await syncAllSources({ notify: false, reason: "startup" });
+});
+
+app.on("web-contents-created", (_event, contents) => {
+  if (contents.getType() !== "webview") return;
+  contents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
 });
 
 app.on("activate", () => {

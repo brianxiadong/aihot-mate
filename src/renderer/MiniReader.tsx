@@ -1,9 +1,22 @@
-import { Bookmark, CheckCheck, ChevronLeft, ChevronRight, ExternalLink, Loader2, Maximize2, Star, X } from "lucide-react";
+import {
+  Bookmark,
+  CheckCheck,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  FileText,
+  Globe2,
+  Loader2,
+  Maximize2,
+  Star,
+  X
+} from "lucide-react";
 import { MouseEvent, useEffect, useMemo, useState } from "react";
 import type { AppState, FeedItem, ReaderArticle } from "../preload/preload";
 import { mate } from "./bridge";
 
 type ArticleStatus = "idle" | "loading" | "ready" | "error";
+type ReaderMode = "article" | "source";
 
 const initialState: AppState = {
   version: 1,
@@ -49,6 +62,7 @@ function MiniReader() {
   const [selectedId, setSelectedId] = useState<string | null>(new URLSearchParams(window.location.search).get("itemId"));
   const [article, setArticle] = useState<ReaderArticle | null>(null);
   const [articleStatus, setArticleStatus] = useState<ArticleStatus>("idle");
+  const [readerMode, setReaderMode] = useState<ReaderMode>("article");
 
   useEffect(() => {
     mate.getState().then((nextState) => {
@@ -87,6 +101,7 @@ function MiniReader() {
     let canceled = false;
     setArticle(null);
     setArticleStatus("loading");
+    setReaderMode("article");
     mate.markRead(selectedItem.id, true).then(setState).catch(() => undefined);
     mate
       .loadArticle(selectedItem.id)
@@ -122,6 +137,10 @@ function MiniReader() {
     }
   }
 
+  function embeddedSourceUrl(item: FeedItem) {
+    return item.originalUrl || item.readerUrl || item.url;
+  }
+
   if (!selectedItem) {
     return (
       <main className="mini-surface empty">
@@ -153,16 +172,35 @@ function MiniReader() {
         <p>{selectedItem.summary}</p>
       </section>
 
-      <article className="mini-article" onClick={handleArticleClick}>
-        {articleStatus === "loading" ? (
-          <div className="mini-loading">
-            <Loader2 size={18} className="spin" />
-            <span>加载正文</span>
-          </div>
-        ) : null}
-        {articleStatus === "error" ? <p>{selectedItem.summary}</p> : null}
-        {articleStatus === "ready" && article ? <div dangerouslySetInnerHTML={{ __html: article.content }} /> : null}
-      </article>
+      {readerMode === "source" ? (
+        <div className="mini-webview-wrap">
+          <webview
+            className="mini-webview"
+            src={embeddedSourceUrl(selectedItem)}
+            partition="persist:aihot-mate-reader"
+            webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
+          />
+        </div>
+      ) : (
+        <article className="mini-article" onClick={handleArticleClick}>
+          {articleStatus === "loading" ? (
+            <div className="mini-loading">
+              <Loader2 size={18} className="spin" />
+              <span>加载正文</span>
+            </div>
+          ) : null}
+          {articleStatus === "error" ? (
+            <div className="mini-inline-fallback">
+              <p>{selectedItem.summary}</p>
+              <button type="button" onClick={() => setReaderMode("source")}>
+                <Globe2 size={14} />
+                <span>看原网页</span>
+              </button>
+            </div>
+          ) : null}
+          {articleStatus === "ready" && article ? <div dangerouslySetInnerHTML={{ __html: article.content }} /> : null}
+        </article>
+      )}
 
       <footer className="mini-actions">
         <button type="button" title="上一条" onClick={() => move(-1)} disabled={selectedIndex <= 0}>
@@ -183,6 +221,14 @@ function MiniReader() {
           onClick={() => mate.toggleSaved(selectedItem.id).then(setState)}
         >
           <Bookmark size={16} />
+        </button>
+        <button
+          type="button"
+          title={readerMode === "source" ? "阅读版" : "原网页"}
+          className={readerMode === "source" ? "active" : ""}
+          onClick={() => setReaderMode(readerMode === "source" ? "article" : "source")}
+        >
+          {readerMode === "source" ? <FileText size={16} /> : <Globe2 size={16} />}
         </button>
         <button type="button" title="全部已读" onClick={() => mate.markAllRead().then(setState)}>
           <CheckCheck size={16} />
