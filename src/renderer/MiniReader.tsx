@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-  FileText,
   Globe2,
   Loader2,
   Maximize2,
@@ -223,14 +222,6 @@ function MiniReader() {
           onClick={() => mate.toggleSaved(selectedItem.id).then(setState)}
         >
           <Bookmark size={16} />
-        </button>
-        <button
-          type="button"
-          title={readerMode === "source" ? "阅读版" : "原网页"}
-          className={readerMode === "source" ? "active" : ""}
-          onClick={() => setReaderMode(readerMode === "source" ? "article" : "source")}
-        >
-          {readerMode === "source" ? <FileText size={16} /> : <Globe2 size={16} />}
         </button>
         <button type="button" title="全部已读" onClick={() => mate.markAllRead().then(setState)}>
           <CheckCheck size={16} />

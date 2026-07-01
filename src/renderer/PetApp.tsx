@@ -38,11 +38,13 @@ function PetApp() {
     return mate.onStateChanged(setState);
   }, []);
 
-  const featured = useMemo(() => {
-    return state.items.find((item) => !item.isRead) || state.items.find((item) => item.kind === "hot-topic") || state.items[0] || null;
-  }, [state.items]);
+  const unreadItem = useMemo(() => state.items.find((item) => !item.isRead) || null, [state.items]);
+  const featured = useMemo(
+    () => unreadItem || state.items.find((item) => item.kind === "hot-topic") || state.items[0] || null,
+    [state.items, unreadItem]
+  );
 
-  const mood = featured?.kind === "hot-topic" ? "hot" : state.counts.unread > 0 ? "new" : "idle";
+  const mood = unreadItem?.kind === "hot-topic" ? "hot" : unreadItem ? "new" : "idle";
 
   async function openMini() {
     await mate.openMini(featured?.id);
@@ -108,13 +110,15 @@ function PetApp() {
 
   return (
     <main className={`pet-surface ${mood}`}>
-      <button className="pet-bubble" type="button" onClick={openMini} title="快速阅读">
-        <span className="pet-bubble-kicker">
-          {featured?.kind === "hot-topic" ? <Flame size={13} /> : <Sparkles size={13} />}
-          {state.counts.unread > 0 ? `${state.counts.unread} 条新内容` : "AIHOT Mate"}
-        </span>
-        <strong>{displayTitle(featured)}</strong>
-      </button>
+      {unreadItem ? (
+        <button className="pet-bubble" type="button" onClick={openMini} title="快速阅读">
+          <span className="pet-bubble-kicker">
+            {unreadItem.kind === "hot-topic" ? <Flame size={13} /> : <Sparkles size={13} />}
+            {state.counts.unread} 条新内容
+          </span>
+          <strong>{displayTitle(unreadItem)}</strong>
+        </button>
+      ) : null}
 
       <button
         className="pet-body"
