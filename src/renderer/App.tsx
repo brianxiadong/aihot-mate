@@ -270,7 +270,12 @@ function App() {
   }
 
   function embeddedSourceUrl(item: FeedItem): string {
-    return item.originalUrl || item.url || item.readerUrl || "";
+    return item.readerUrl || item.url || item.originalUrl || "";
+  }
+
+  function originalSourceUrl(item: FeedItem): string | null {
+    const sourceUrl = item.originalUrl || "";
+    return sourceUrl && sourceUrl !== embeddedSourceUrl(item) ? sourceUrl : null;
   }
 
   return (
@@ -442,6 +447,11 @@ function App() {
             <div className="reader-summary">
               <span className="category-pill">{categoryLabels[selectedItem.category] || selectedItem.category}</span>
               {selectedItem.score !== null ? <span className={scoreTone(selectedItem.score)}>{selectedItem.score}</span> : null}
+              {originalSourceUrl(selectedItem) ? (
+                <button type="button" onClick={() => mate.openExternal(originalSourceUrl(selectedItem) || "")}>
+                  原文
+                </button>
+              ) : null}
             </div>
 
             <div className="embedded-reader">
