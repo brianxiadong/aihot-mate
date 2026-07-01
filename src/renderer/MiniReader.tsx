@@ -4,18 +4,13 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-  Globe2,
-  Loader2,
   Maximize2,
   Star,
   X
 } from "lucide-react";
-import { MouseEvent, useEffect, useMemo, useState } from "react";
-import type { AppState, FeedItem, ReaderArticle } from "../preload/preload";
+import { useEffect, useMemo, useState } from "react";
+import type { AppState, FeedItem } from "../preload/preload";
 import { mate } from "./bridge";
-
-type ArticleStatus = "idle" | "loading" | "ready" | "error";
-type ReaderMode = "article" | "source";
 
 const initialState: AppState = {
   version: 1,
@@ -59,9 +54,6 @@ function pickInitialItem(items: FeedItem[], requestedId: string | null) {
 function MiniReader() {
   const [state, setState] = useState<AppState>(initialState);
   const [selectedId, setSelectedId] = useState<string | null>(new URLSearchParams(window.location.search).get("itemId"));
-  const [article, setArticle] = useState<ReaderArticle | null>(null);
-  const [articleStatus, setArticleStatus] = useState<ArticleStatus>("idle");
-  const [readerMode, setReaderMode] = useState<ReaderMode>("article");
 
   useEffect(() => {
     mate.getState().then((nextState) => {
@@ -91,34 +83,8 @@ function MiniReader() {
   const selectedIndex = selectedItem ? state.items.findIndex((item) => item.id === selectedItem.id) : -1;
 
   useEffect(() => {
-    if (!selectedItem) {
-      setArticle(null);
-      setArticleStatus("idle");
-      return;
-    }
-
-    let canceled = false;
-    setArticle(null);
-    setArticleStatus("loading");
-    setReaderMode("article");
+    if (!selectedItem) return;
     mate.markRead(selectedItem.id, true).then(setState).catch(() => undefined);
-    mate
-      .loadArticle(selectedItem.id)
-      .then((nextArticle) => {
-        if (!canceled) {
-          setArticle(nextArticle);
-          setArticleStatus("ready");
-        }
-      })
-      .catch(() => {
-        if (!canceled) {
-          setArticleStatus("error");
-        }
-      });
-
-    return () => {
-      canceled = true;
-    };
   }, [selectedItem?.id]);
 
   function move(offset: number) {
@@ -127,17 +93,8 @@ function MiniReader() {
     if (next) setSelectedId(next.id);
   }
 
-  function handleArticleClick(event: MouseEvent<HTMLElement>) {
-    const target = event.target as HTMLElement;
-    const anchor = target.closest("a");
-    if (anchor instanceof HTMLAnchorElement && anchor.href) {
-      event.preventDefault();
-      mate.openExternal(anchor.href);
-    }
-  }
-
-  function embeddedSourceUrl(item: FeedItem) {
-    return item.readerUrl || item.url || item.originalUrl;
+  function officialReaderUrl(item: FeedItem): string {
+    return item.readerUrl || item.url || item.originalUrl || "";
   }
 
   if (!selectedItem) {
@@ -166,41 +123,15 @@ function MiniReader() {
         </button>
       </header>
 
-      <div className={readerMode === "source" ? "mini-content source" : "mini-content"}>
-        <section className="mini-headline">
-          <h1>{selectedItem.title}</h1>
-          <p>{selectedItem.summary}</p>
-        </section>
-
-        {readerMode === "source" ? (
-          <div className="mini-webview-wrap">
-            <webview
-              className="mini-webview"
-              src={embeddedSourceUrl(selectedItem)}
-              partition="persist:aihot-mate-reader"
-              webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
-            />
-          </div>
-        ) : (
-          <article className="mini-article" onClick={handleArticleClick}>
-            {articleStatus === "loading" ? (
-              <div className="mini-loading">
-                <Loader2 size={18} className="spin" />
-              <span>加载正文</span>
-            </div>
-            ) : null}
-            {articleStatus === "error" ? (
-              <div className="mini-inline-fallback">
-                <p>{selectedItem.summary}</p>
-                <button type="button" onClick={() => setReaderMode("source")}>
-                  <Globe2 size={14} />
-                <span>看原网页</span>
-                </button>
-            </div>
-            ) : null}
-            {articleStatus === "ready" && article ? <div dangerouslySetInnerHTML={{ __html: article.content }} /> : null}
-          </article>
-        )}
+      <div className="mini-content webview-only">
+        <div className="mini-webview-wrap">
+          <webview
+            className="mini-webview"
+            src={officialReaderUrl(selectedItem)}
+            partition="persist:aihot-mate-reader"
+            webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
+          />
+        </div>
       </div>
 
       <footer className="mini-actions">
@@ -226,7 +157,7 @@ function MiniReader() {
         <button type="button" title="全部已读" onClick={() => mate.markAllRead().then(setState)}>
           <CheckCheck size={16} />
         </button>
-        <button type="button" title="浏览器打开" onClick={() => mate.openExternal(selectedItem.url)}>
+        <button type="button" title="浏览器打开" onClick={() => mate.openExternal(officialReaderUrl(selectedItem))}>
           <ExternalLink size={16} />
         </button>
         <button type="button" title="主页面" onClick={() => mate.openMain(selectedItem.id)}>
